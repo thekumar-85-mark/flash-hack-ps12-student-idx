@@ -5,7 +5,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define MAX_FRAGS 128
+#define MAX_FRAGS 100
 
 typedef struct Node {
     int val;
