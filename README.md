@@ -5,10 +5,10 @@ A C-based solution that reconstructs a single, valid Binary Search Tree (BST) fr
 ---
 
 ## Team Members
-1. **Member 1** – Role / GitHub Handle
-2. **Member 2** – Role / GitHub Handle
-3. **Member 3** – Role / GitHub Handle
-4. **Member 4** – Role / GitHub Handle
+1. **Sunil Maruti Kadam** – 1DS25CS282 / [GitHub Handle](https://github.com/sunilkadam2781-maker)
+2. **Udith V Kumar** – 1DS25CS300 / [GitHub Handle](https://github.com/thekumar-85-mark)
+3. **Viraj Guranna Yalawar** – 1DS25CS310 / [GitHub Handle](https://github.com/virajgurannayalawar)
+4. **Yashwantha Kumara** – 1DS25CS314 / [GitHub Handle](https://github.com/Yash2008may)
 
 ---
 
