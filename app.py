@@ -6,6 +6,8 @@ import time
 import streamlit as st
 import streamlit.components.v1 as components
 
+MAX_FRAGS = 100
+
 st.set_page_config(
     page_title="REGISTRAR_SYS // INDEX_RECOVERY_v2.6",
     page_icon="🌳",
@@ -41,6 +43,9 @@ def parse_fragments_expression(expr: str):
         stripped = tag_pattern.sub("", text)
         if re.sub(r"[\s,;]+", "", stripped) != "":
             return [], f"Invalid syntax near: '{stripped.strip()}'"
+
+        if len(matches) > MAX_FRAGS:
+            return [], f"Fragment count exceeds maximum allowed ({MAX_FRAGS})."
 
         seen_roots = set()
         for idx, m in enumerate(matches):
@@ -88,8 +93,12 @@ def parse_fragments_expression(expr: str):
     if len(lines) > 1 and re.fullmatch(r"\d+", lines[0]):
         start_idx = 1
 
+    frag_lines = lines[start_idx:]
+    if len(frag_lines) > MAX_FRAGS:
+        return [], f"Fragment count exceeds maximum allowed ({MAX_FRAGS})."
+
     seen_roots = set()
-    for i, ln in enumerate(lines[start_idx:], start=1):
+    for i, ln in enumerate(frag_lines, start=1):
         tokens = ln.split()
         if len(tokens) < 1 or len(tokens) > 3:
             return [], f"Line {i} must have 1 to 3 values: root [left] [right]."
@@ -174,7 +183,8 @@ def run_c_engine(fragments):
     return "\n".join(raw_lines).strip(), None, elapsed_ms
 
 
-def generate_stress_fragments(count: int = 3000):
+def generate_max_valid_fragments(count: int = MAX_FRAGS):
+    """Generates up to MAX_FRAGS (100) valid mergeable BST fragments."""
     frags = []
     for i in range(1, count + 1):
         val = count + 2 - i
@@ -184,7 +194,7 @@ def generate_stress_fragments(count: int = 3000):
 
 
 # ---------------------------------------------------------------------------
-# Presets
+# Presets (Aligned with 1-100 Fragment Constraint)
 # ---------------------------------------------------------------------------
 PRESETS = {
     "preset_1": {
@@ -215,10 +225,10 @@ PRESETS = {
         "expr": "T1=[2,1], T2=[3,2,5], T3=[5,4], T4=[99,95]",
     },
     "preset_5": {
-        "label": "PRESET 5: STRESS (3,000)",
-        "sub": "BENCHMARK 3,000 FRAGMENTS",
+        "label": "PRESET 5: MAX BOUND (100)",
+        "sub": "BENCHMARK 100 FRAGMENTS",
         "color": "#D580FF",
-        "expr": "__STRESS_3000__",
+        "expr": "__MAX_100__",
     },
 }
 
@@ -242,18 +252,15 @@ def apply_preset(key: str):
     st.session_state.active_preset = key
     st.session_state.mode_step = False
     p = PRESETS[key]
-    if p["expr"] == "__STRESS_3000__":
-        t0 = time.perf_counter()
-        frags = generate_stress_fragments(3000)
-        gen_ms = (time.perf_counter() - t0) * 1000.0
+    if p["expr"] == "__MAX_100__":
+        frags = generate_max_valid_fragments(MAX_FRAGS)
+        out, c_err, ms = run_c_engine(frags)
         st.session_state.fragments = frags
         st.session_state.editor_text = (
-            "T1=[3002,3001], T2=[3001,3000], ... (3,000 generated fragments)"
+            f"T1=[102,101], T2=[101,100], ... ({MAX_FRAGS} fragments at MAX_FRAGS limit)"
         )
-        st.session_state.c_stdout = (
-            f"SUCCESS\nMerged Root: 3002\nStress benchmark generated 3,000 valid fragments in {gen_ms:.2f} ms."
-        )
-        st.session_state.exec_ms = round(gen_ms, 2)
+        st.session_state.c_stdout = c_err or out or ""
+        st.session_state.exec_ms = round(ms, 2) if ms > 0 else 0.50
     else:
         frags, err = parse_fragments_expression(p["expr"])
         if not err:
@@ -457,20 +464,20 @@ st.markdown(
 # Top Header & KPI Strip
 # ---------------------------------------------------------------------------
 frags_curr = st.session_state.fragments
-total_nodes = len(frags_curr) * 2 if len(frags_curr) <= 20 else len(frags_curr) + 2
-tree_height = min(len(frags_curr), 12) if frags_curr else 0
+total_nodes = len(frags_curr) + 1 if frags_curr else 0
+tree_height = len(frags_curr) if frags_curr else 0
 
 hdr_left, hdr_right = st.columns([1.35, 1.0], gap="medium")
 with hdr_left:
     st.markdown(
-        """
+        f"""
         <div class="nb-header-bar">
             <div>
                 <span class="nb-badge-dark">REGISTRAR_SYS // INDEX_RECOVERY_v2.6</span>
-                <span class="nb-badge-cyan">PS12 :: BST STRUCTURAL VALIDATION</span>
+                <span class="nb-badge-cyan">PS12 :: BST STRUCTURAL VALIDATION (1–{MAX_FRAGS})</span>
             </div>
             <div class="nb-title">THE REGISTRAR'S FRAGMENTED STUDENT INDEX</div>
-            <p class="nb-sub">Reconstructs corrupted 1–3 node BST fragments into a globally valid Student Index or diagnoses structural violations.</p>
+            <p class="nb-sub">Reconstructs corrupted 1–3 node BST fragments (1–{MAX_FRAGS} fragments) into a globally valid Student Index or diagnoses structural violations.</p>
         </div>
         """,
         unsafe_allow_html=True,
@@ -483,11 +490,11 @@ with hdr_right:
             <div class="nb-kpi-grid">
                 <div class="nb-kpi">
                     <div class="nb-kpi-lbl">Fragments</div>
-                    <div class="nb-kpi-val">{len(frags_curr):,}</div>
+                    <div class="nb-kpi-val">{len(frags_curr)}/{MAX_FRAGS}</div>
                 </div>
                 <div class="nb-kpi">
                     <div class="nb-kpi-lbl">Total Nodes</div>
-                    <div class="nb-kpi-val">{total_nodes:,}</div>
+                    <div class="nb-kpi-val">{total_nodes}</div>
                 </div>
                 <div class="nb-kpi">
                     <div class="nb-kpi-lbl">Tree Height</div>
@@ -578,12 +585,13 @@ with left_col:
         height=95,
         label_visibility="collapsed",
     )
-    st.caption("Use `null` or `-` for absent children (e.g. `[3,-,5]`).")
+    st.caption(f"Supports 1–{MAX_FRAGS} fragments. Use `null` or `-` for absent children (e.g. `[3,-,5]`).")
 
     if merge_clicked or step_clicked:
         st.session_state.mode_step = bool(step_clicked)
         parsed, parse_err = parse_fragments_expression(edited_expr)
         if parse_err:
+            st.session_state.c_stdout = f"IMPOSSIBLE: {parse_err}"
             st.error(f"IMPOSSIBLE: {parse_err}")
         else:
             st.session_state.fragments = parsed
@@ -608,22 +616,25 @@ with left_col:
         b_right = st.text_input("RIGHT", value="-")
 
     if st.button("+ ADD FRAGMENT", use_container_width=True):
-        candidate = f"{b_tag.strip() or 'TX'}=[{b_root.strip()},{b_left.strip()},{b_right.strip()}]"
-        combined = (
-            f"{st.session_state.editor_text}, {candidate}"
-            if st.session_state.editor_text.strip()
-            else candidate
-        )
-        parsed, parse_err = parse_fragments_expression(combined)
-        if parse_err:
-            st.error(parse_err)
+        if len(st.session_state.fragments) >= MAX_FRAGS:
+            st.error(f"Maximum of {MAX_FRAGS} fragments reached.")
         else:
-            st.session_state.fragments = parsed
-            st.session_state.editor_text = combined
-            out, c_err, ms = run_c_engine(parsed)
-            st.session_state.c_stdout = c_err or out or ""
-            st.session_state.exec_ms = round(ms, 2)
-            st.rerun()
+            candidate = f"{b_tag.strip() or 'TX'}=[{b_root.strip()},{b_left.strip()},{b_right.strip()}]"
+            combined = (
+                f"{st.session_state.editor_text}, {candidate}"
+                if st.session_state.editor_text.strip()
+                else candidate
+            )
+            parsed, parse_err = parse_fragments_expression(combined)
+            if parse_err:
+                st.error(parse_err)
+            else:
+                st.session_state.fragments = parsed
+                st.session_state.editor_text = combined
+                out, c_err, ms = run_c_engine(parsed)
+                st.session_state.c_stdout = c_err or out or ""
+                st.session_state.exec_ms = round(ms, 2)
+                st.rerun()
 
     palette = ["#FFE600", "#00E5FF", "#D580FF", "#00C853", "#FFB020"]
     preview_frags = st.session_state.fragments[:6]
@@ -910,7 +921,6 @@ with right_col:
           const svg = document.getElementById("treeSvg");
           const wrap = document.getElementById("svgWrap");
           const w = wrap.clientWidth || 650;
-          const h = wrap.clientHeight || 250;
           svg.innerHTML = "";
 
           const g = document.createElementNS("http://www.w3.org/2000/svg", "g");
@@ -1100,30 +1110,38 @@ with right_col:
 c_out_str = st.session_state.c_stdout
 is_impossible = (not c_out_str) or ("IMPOSSIBLE" in c_out_str)
 
-sorted_ids = []
-if not is_impossible and st.session_state.fragments:
-    vals = set()
-    for f in st.session_state.fragments:
-        vals.add(f["root"])
-        if f["left"] is not None:
-            vals.add(f["left"])
-        if f["right"] is not None:
-            vals.add(f["right"])
-    sorted_ids = sorted(vals)
+merged_root_val = "—"
+inorder_values = []
+tree_struct_text = ""
+
+if c_out_str and not is_impossible:
+    in_tree_block = False
+    tree_lines = []
+    for line in c_out_str.splitlines():
+        if line.startswith("Merged Root:"):
+            merged_root_val = line.split(":", 1)[1].strip()
+        elif line.startswith("Inorder Traversal:"):
+            m_in = re.search(r"\[([^\]]*)\]", line)
+            if m_in and m_in.group(1).strip():
+                inorder_values = [x.strip() for x in m_in.group(1).split(",") if x.strip()]
+        elif line.startswith("Tree Structure:"):
+            in_tree_block = True
+        elif in_tree_block:
+            tree_lines.append(line)
+    tree_struct_text = "\n".join(tree_lines)
 
 status_bg = "#FF3B30" if is_impossible else "#00C853"
 status_fg = "#FFFFFF" if is_impossible else "#000000"
 status_txt = "IMPOSSIBLE" if is_impossible else "RECOVERED"
 diag_msg = (
-    c_out_str.replace("\n", " | ")
-    if c_out_str
-    else "No valid fragment set loaded."
+    c_out_str.splitlines()[0]
+    if (c_out_str and not is_impossible)
+    else (c_out_str.replace("\n", " | ") if c_out_str else "No valid fragment set loaded.")
 )
-merged_root_val = str(sorted_ids[len(sorted_ids) // 2]) if sorted_ids else "—"
 
 tape_cells_html = ""
-if sorted_ids:
-    for idx, val in enumerate(sorted_ids):
+if inorder_values:
+    for idx, val in enumerate(inorder_values):
         cell_bg = palette[idx % len(palette)]
         tape_cells_html += (
             f"<span style='display:inline-block; background:{cell_bg}; border:2px solid #000; "
@@ -1131,6 +1149,12 @@ if sorted_ids:
         )
 else:
     tape_cells_html = "<span style='font-size:12px; color:#555;'>Inorder tape unavailable until a valid BST is recovered.</span>"
+
+tree_preview_html = (
+    f"<pre style='background:#FAF7F0; border:2px solid #000; padding:10px; margin:10px 0 0 0; font-size:12px; overflow-x:auto;'>{tree_struct_text}</pre>"
+    if tree_struct_text
+    else ""
+)
 
 st.markdown(
     f"""
@@ -1149,11 +1173,12 @@ st.markdown(
         <div style="border-top:2px solid #000; padding-top:10px;">
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
                 <span class="nb-badge-dark">INORDER TRAVERSAL TAPE (SORTED STUDENT INDEX)</span>
-                <span style="font-size:11px; font-weight:700;">Click any tape cell to locate &amp; highlight the student node in the tree</span>
+                <span style="font-size:11px; font-weight:700;">Sorted keys from C engine recovery output</span>
             </div>
             <div style="background:#FAF7F0; border:2px solid #000; padding:10px; overflow-x:auto; white-space:nowrap;">
                 {tape_cells_html}
             </div>
+            {tree_preview_html}
         </div>
     </div>
     """,
