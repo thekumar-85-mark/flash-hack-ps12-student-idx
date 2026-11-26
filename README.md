@@ -11,6 +11,15 @@ A C-based solution that reconstructs a single, valid Binary Search Tree (BST) fr
 4. 🧑‍💻 **Yashwantha Kumara** – 1DS25CS314 / [GitHub](https://github.com/Yash2008may)
 
 ---
+## 🏗️ Project Architecture
+
+```text
+student-idx-recovery/
+├── student_index_BST.c   # C recovery engine (parsing, stitching, global BST check)
+├── app.py                # Neo-Brutalist Streamlit dashboard, presets, SVG tree & console
+└── README.md             # Project documentation, architecture & progress
+
+---
 
 ## 🚀 Step-by-Step Introduction
 1. 📄 **Understand the Fragment Format:** Each input fragment represents a local root node with up to two immediate children (`root [left] [right]`, using `-` when a child is absent).
